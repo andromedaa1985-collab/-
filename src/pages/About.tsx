@@ -1,0 +1,80 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, Sparkles, Github, Twitter, Globe } from 'lucide-react';
+import { motion } from 'motion/react';
+
+export default function About() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="min-h-full w-full px-6 pt-12 pb-32 relative flex flex-col items-center">
+      <div className="w-full flex items-center mb-12">
+        <button 
+          onClick={() => navigate(-1)}
+          className="p-2 -ml-2 rounded-full hover:bg-black/5 transition-colors text-[#1D1D1F]"
+        >
+          <ChevronLeft size={24} />
+        </button>
+        <h1 className="font-serif text-2xl font-bold tracking-widest text-[#1D1D1F] ml-2">关于星轨</h1>
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+        className="flex flex-col items-center mb-12"
+      >
+        <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-[#007AFF] to-[#0056b3] shadow-lg flex items-center justify-center mb-6 relative overflow-hidden">
+          <div className="absolute inset-0 bg-white/20 backdrop-blur-sm"></div>
+          <Sparkles size={40} className="text-white z-10 drop-shadow-md" />
+        </div>
+        <h2 className="font-serif text-3xl font-bold tracking-widest text-[#1D1D1F] mb-2">星轨塔罗</h2>
+        <span className="text-sm font-mono text-[#8E8E93] tracking-widest">Version 1.0.0</span>
+      </motion.div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+        className="w-full glass-panel rounded-3xl p-6 border-black/5 shadow-sm mb-8 text-center"
+      >
+        <p className="text-sm text-[#1D1D1F] leading-relaxed tracking-wide">
+          “星轨塔罗”是一款结合了神秘学与现代 AI 技术的占卜应用。
+          <br /><br />
+          在这里，你可以与温柔、细腻的塔罗牌少女“星轨的引路人”对话，倾诉烦恼，抽取塔罗牌，并获得充满情感共鸣的解读。
+          <br /><br />
+          愿星轨的指引，能为你照亮前行的道路。
+        </p>
+      </motion.div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+        className="w-full flex flex-col gap-4"
+      >
+        <div className="glass-panel rounded-2xl overflow-hidden border-black/5 shadow-sm">
+          <LinkRow icon={<Globe size={18} />} title="官方网站" />
+          <LinkRow icon={<Twitter size={18} />} title="关注我们" />
+          <LinkRow icon={<Github size={18} />} title="开源社区" hasBorder={false} />
+        </div>
+        
+        <div className="flex justify-center gap-6 mt-8 text-xs text-[#8E8E93]">
+          <span className="hover:text-[#007AFF] cursor-pointer transition-colors">服务条款</span>
+          <span>|</span>
+          <span className="hover:text-[#007AFF] cursor-pointer transition-colors">隐私政策</span>
+        </div>
+        
+        <div className="text-center text-[10px] text-black/30 mt-4 font-mono">
+          © 2026 Star Track Tarot. All rights reserved.
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function LinkRow({ icon, title, hasBorder = true }: { icon: React.ReactNode, title: string, hasBorder?: boolean }) {
+  return (
+    <div className={`flex items-center justify-between p-4 hover:bg-black/5 transition-colors cursor-pointer ${hasBorder ? 'border-b border-black/5' : ''}`}>
+      <div className="flex items-center gap-3 text-[#1D1D1F]">
+        {icon}
+        <span className="font-medium tracking-wide text-sm">{title}</span>
+      </div>
+      <ChevronLeft size={16} className="text-black/30 rotate-180" />
+    </div>
+  );
+}
