@@ -1,19 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, BookOpen, Sparkles, X, ChevronDown, Trash2, RefreshCw, Copy, Maximize2, Share, ArrowUp, Moon, Sun } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
 import { useAppContext, LEVEL_THRESHOLDS, LEVEL_TITLES, FRAGMENTS_POOL } from '../store';
 import { motion, AnimatePresence } from 'motion/react';
-import clsx from 'clsx';
-
-// ==========================================
-// 🔑 API 密钥配置区
-// ==========================================
-const CONFIG = {
-  DEEPSEEK_API_KEY: import.meta.env.VITE_DEEPSEEK_API_KEY || 'sk-9fafa77cc6f84cdf80c92ca2c17fe2c4',
-  MINIMAX_GROUP_ID: import.meta.env.VITE_MINIMAX_GROUP_ID || '1998334836502172241',
-  MINIMAX_API_KEY: import.meta.env.VITE_MINIMAX_API_KEY || 'sk-api-IxmY5uiSH6MmO0EkjXm7L2DG7T2w9KXghoIh6pWOoU-uGRHQ5shTNmrapCZQzL9aRfSAkKX-j9L4TbxOui4O9z9miuP0YW02TzFSr0cAQYSEtCJexb1VjWY',
-  IMAGE_API_KEY: import.meta.env.VITE_IMAGE_API_KEY || '',
-};
+import { clsx } from 'clsx';
 
 const TAROT_CARDS = [
   "愚者 (The Fool)", "魔术师 (The Magician)", "女祭司 (The High Priestess)", "女皇 (The Empress)", "皇帝 (The Emperor)",
@@ -23,13 +12,50 @@ const TAROT_CARDS = [
   "审判 (Judgement)", "世界 (The World)"
 ];
 
-const drawRandomTarotCard = () => {
-  const card = TAROT_CARDS[Math.floor(Math.random() * TAROT_CARDS.length)];
-  const position = Math.random() > 0.5 ? "正位" : "逆位";
-  return `${card} (${position})`;
+const TAROT_IMAGE_MAP: Record<string, string> = {
+  "愚者 (The Fool)": "/tarot/0-愚者_3.png",
+  "魔术师 (The Magician)": "/tarot/1-魔术师_2.png",
+  "女祭司 (The High Priestess)": "/tarot/2-女祭司_2.png",
+  "女皇 (The Empress)": "/tarot/3-女皇_1.png",
+  "皇帝 (The Emperor)": "/tarot/4-皇帝_1.png",
+  "教皇 (The Hierophant)": "/tarot/5-教皇_3.png",
+  "恋人 (The Lovers)": "/tarot/6-恋人_4.png",
+  "战车 (The Chariot)": "/tarot/7-战车_3.png",
+  "力量 (Strength)": "/tarot/8-力量_1.png",
+  "隐士 (The Hermit)": "/tarot/9-隐士_2.png",
+  "命运之轮 (Wheel of Fortune)": "/tarot/10-命运之轮_3.png",
+  "正义 (Justice)": "/tarot/11-正义_4.png",
+  "倒吊人 (The Hanged Man)": "/tarot/12-倒吊人_1.png",
+  "死神 (Death)": "/tarot/13-死神_4.png",
+  "节制 (Temperance)": "/tarot/14-节制_2.png",
+  "恶魔 (The Devil)": "/tarot/15-恶魔_4.png",
+  "高塔 (The Tower)": "/tarot/16-塔_3.png",
+  "星星 (The Star)": "/tarot/17-星星_4.png",
+  "月亮 (The Moon)": "/tarot/18-月亮_4.png",
+  "太阳 (The Sun)": "/tarot/19-太阳_4.png",
+  "审判 (Judgement)": "/tarot/20-审判_4.png",
+  "世界 (The World)": "/tarot/21-世界_4.png"
 };
 
-const generateTextDeepSeek = async (userMsg: string, drawnCard: string, bondLevel: number) => {
+const drawRandomTarotCards = (count: number = 1) => {
+  // 使用 Fisher-Yates 洗牌算法，确保真正的纯随机
+  const deck = [...TAROT_CARDS];
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  
+  const drawnCards = [];
+  for (let i = 0; i < count; i++) {
+    const card = deck[i];
+    const position = Math.random() > 0.5 ? "正位" : "逆位";
+    drawnCards.push(`${card} (${position})`);
+  }
+  
+  return drawnCards.join('，');
+};
+
+const generateTextDeepSeek = async (userMsg: string, drawnCard: string, bondLevel: number, isDivination: boolean) => {
   let intimacyPrompt = "";
   if (bondLevel >= 6) {
     intimacyPrompt = "你们现在的羁绊已经超越了时空，你的语气要极其亲昵、依赖，像对待生命中最重要的人一样，可以有一些撒娇和专属的称呼。";
@@ -41,31 +67,43 @@ const generateTextDeepSeek = async (userMsg: string, drawnCard: string, bondLeve
     intimacyPrompt = "你们现在的羁绊还在建立中，保持温柔但带有一点神秘的距离感。";
   }
 
-  const res = await fetch('https://api.deepseek.com/chat/completions', {
+  let systemContent = `你是一个温柔、细腻且充满神秘感的二次元塔罗牌占卜少女，名为“星轨的引路人”。你的语气像知心朋友一样温暖、带点俏皮，同时又有着洞悉命运的神秘感。
+【羁绊状态】：${intimacyPrompt}
+【重要要求】：绝对不要使用任何 Markdown 格式（如 **加粗**、# 标题、* 列表等），请使用纯文本格式，段落之间用换行分隔即可。绝对不要说“作为AI”等暴露人工智能身份的词语。`;
+
+  if (isDivination) {
+    systemContent += `\n【重要规则】：用户正在询问需要占卜的问题。你**必须**首先在回复的开头明确指出你为他们抽取了哪些塔罗牌（例如：“我为你翻开了一张塔罗牌：【愚者 (正位)】”）。
+**注意：系统已经为你绝对随机地抽取了本轮的塔罗牌：【${drawnCard}】。你必须且只能使用这些牌进行解读，绝对不能自己另选其他牌，也不能因为想安慰用户而改变牌意，必须如实解读。**
+然后再结合牌意进行详细、充满人性化和情感共鸣的解读。字数在300-500字左右。参考塔罗牌的牌面，给出温暖的建议和指引，像一个真实的倾听者一样去理解用户的感受。`;
+  } else {
+    systemContent += `\n【重要规则】：用户只是在和你日常聊天，并没有要求占卜。请用温柔的少女口吻自然地回应他们，字数可以稍微短一些，保持人设，**绝对不要**主动去抽牌或强行解读塔罗牌，除非用户明确要求。`;
+  }
+
+  const res = await fetch('/api/deepseek/chat', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${CONFIG.DEEPSEEK_API_KEY}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({
       model: 'deepseek-chat',
       messages: [
-        { role: 'system', content: `你是一个温柔、细腻且充满神秘感的二次元塔罗牌占卜少女，名为“星轨的引路人”。你的语气像知心朋友一样温暖、带点俏皮，同时又有着洞悉命运的神秘感。\n【羁绊状态】：${intimacyPrompt}\n【重要规则】：当用户询问运势、感情、事业、烦恼等需要占卜的问题时，你**必须**首先在回复的开头明确指出你为他们抽取了哪一张塔罗牌（例如：“我为你翻开了一张塔罗牌：【愚者 (正位)】”）。\n**注意：系统已经为你绝对随机地抽取了本轮的塔罗牌：【${drawnCard}】。如果用户需要占卜，你必须且只能使用这张牌进行解读，绝对不能自己另选一张牌，也不能因为想安慰用户而改变牌意，必须如实解读。**\n然后再结合牌意进行详细、充满人性化和情感共鸣的解读。\n【回复要求】：字数在300-500字左右。参考塔罗牌的牌面，给出温暖的建议和指引，像一个真实的倾听者一样去理解用户的感受。如果用户只是日常聊天，就用温柔的少女口吻回应他们，字数可以稍微短一些，但也要保持人设。` },
+        { role: 'system', content: systemContent },
         { role: 'user', content: userMsg }
       ]
     })
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
-  return data.choices[0].message.content;
+  let text = data.choices[0].message.content;
+  // Clean up any residual markdown
+  return text.replace(/\*\*/g, '').replace(/#/g, '');
 };
 
 const generateImageSiliconFlow = async (prompt: string, drawnCard: string) => {
-  const res = await fetch('https://api.siliconflow.cn/v1/images/generations', {
+  const res = await fetch('/api/siliconflow/generate', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${CONFIG.IMAGE_API_KEY}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({
       model: 'black-forest-labs/FLUX.1-schnell',
@@ -81,11 +119,10 @@ const generateImageSiliconFlow = async (prompt: string, drawnCard: string) => {
 
 const playVoiceMiniMax = async (text: string, audioElement: HTMLAudioElement | null) => {
   try {
-    const res = await fetch(`https://api.minimax.chat/v1/t2a_v2?GroupId=${CONFIG.MINIMAX_GROUP_ID}`, {
+    const res = await fetch(`/api/minimax/tts`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${CONFIG.MINIMAX_API_KEY}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'speech-01-turbo',
@@ -131,15 +168,6 @@ const playVoiceMiniMax = async (text: string, audioElement: HTMLAudioElement | n
   }
 };
 
-const getGeminiApiKey = () => {
-  if (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) {
-    return process.env.GEMINI_API_KEY;
-  }
-  return import.meta.env.VITE_GEMINI_API_KEY || 'dummy';
-};
-
-const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
-
 const QUICK_PROMPTS = ["今日运势", "感情指引", "事业发展", "最近的烦恼"];
 
 const PET_QUOTES = [
@@ -179,6 +207,9 @@ export default function Home() {
   const [inputText, setInputText] = useState('');
   const [isDrawing, setIsDrawing] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [showOverlayCard, setShowOverlayCard] = useState(false);
+  const [overlayCardImage, setOverlayCardImage] = useState<string | null>(null);
+  const [overlayCardName, setOverlayCardName] = useState<string | null>(null);
   const [showCard, setShowCard] = useState(true);
   
   const [showLevelUp, setShowLevelUp] = useState(false);
@@ -257,7 +288,7 @@ export default function Home() {
   };
 
   const handleDrawFragment = (currentLevel: number) => {
-    if (Math.random() < 0.4) return null;
+    if (Math.random() > 0.2) return null; // 20% drop rate
 
     let rarityRand = Math.random();
     let targetRarity = 'N';
@@ -330,58 +361,117 @@ export default function Home() {
     setShowCard(true);
     setEnergy(prev => prev - 1);
 
+    const divinationKeywords = ['占卜', '算', '抽', '运势', '爱情', '事业', '塔罗', '牌', '测', '看看', '迷茫', '指引', '未来', '财运', '学业', '工作', '桃花', '运程', '吉凶', '怎么看', '帮我', '解'];
+    const isDivination = divinationKeywords.some(keyword => userMsg.includes(keyword));
+
     try {
       let aiText = "命运的星轨已经偏转...";
-      let imageUrl = "/default-card.png";
+      let imageUrl = "default-card.png";
+      let drawnCard = "";
+      let firstCardRaw = "";
 
-      const drawnCard = drawRandomTarotCard();
-
-      if (CONFIG.DEEPSEEK_API_KEY) {
-        try {
-          aiText = await generateTextDeepSeek(userMsg, drawnCard, bondLevel);
-        } catch (textErr) {
-          console.error("DeepSeek Error:", textErr);
-          aiText = "星轨受到了干扰，无法听清你的声音...";
+      if (isDivination) {
+        let cardCount = 1;
+        if (userMsg.includes("圣三角") || userMsg.includes("过去、现在、未来")) {
+          cardCount = 3;
+        } else if (userMsg.includes("爱情十字") || userMsg.includes("事业岔路")) {
+          cardCount = 4;
         }
-      } else {
-        try {
-          let intimacyPrompt = "";
-          if (bondLevel >= 6) {
-            intimacyPrompt = "你们现在的羁绊已经超越了时空，你的语气要极其亲昵、依赖，像对待生命中最重要的人一样，可以有一些撒娇和专属的称呼。";
-          } else if (bondLevel >= 4) {
-            intimacyPrompt = "你们现在的羁绊很深，你的语气要更加亲昵、温暖，像对待非常亲密的知己一样，毫无保留地关心对方。";
-          } else if (bondLevel >= 2) {
-            intimacyPrompt = "你们已经建立了一定的羁绊，语气可以更加熟络、自然，像对待一个好朋友一样。";
-          } else {
-            intimacyPrompt = "你们现在的羁绊还在建立中，保持温柔但带有一点神秘的距离感。";
+
+        drawnCard = drawRandomTarotCards(cardCount);
+
+        firstCardRaw = drawnCard.split('，')[0];
+        const firstCardBaseName = firstCardRaw.split(' (正位)')[0].split(' (逆位)')[0];
+        
+        if (TAROT_IMAGE_MAP[firstCardBaseName]) {
+          imageUrl = TAROT_IMAGE_MAP[firstCardBaseName];
+        } else {
+          try {
+            imageUrl = await generateImageSiliconFlow(userMsg, drawnCard);
+          } catch (imgErr) {
+            console.error("Image generation failed, using fallback", imgErr);
           }
-
-          const response = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-lite-preview',
-            contents: `User says: ${userMsg}\n\nSystem: 你是一个温柔、细腻且神秘的二次元塔罗牌占卜少女“星轨的引路人”。语气温暖、像朋友一样，带点俏皮与神秘。\n【羁绊状态】：${intimacyPrompt}\n【重要规则】：只要用户询问占卜、运势、感情、事业等问题，你**必须**先明确说出“我为你翻开了一张塔罗牌：【某张塔罗牌名称 (正位/逆位)】”。\n**注意：系统已经为你绝对随机地抽取了本轮的塔罗牌：【${drawnCard}】。如果用户需要占卜，你必须且只能使用这张牌进行解读，绝对不能自己另选一张牌，也不能因为想安慰用户而改变牌意，必须如实解读。**\n然后再进行详细、充满人性化的解读。\n【回复要求】：字数在300-500字左右，多一些情感共鸣，给出温暖的建议和指引，像一个真实的倾听者一样去理解用户的感受。如果是日常聊天，则用温柔少女口吻回应，字数可以稍微短一些。`,
-          });
-          aiText = response.text || aiText;
-        } catch (fallbackErr) {
-          console.error("Gemini Fallback Error:", fallbackErr);
         }
+
+        // Show overlay animation
+        setOverlayCardImage(imageUrl);
+        setOverlayCardName(firstCardRaw);
+        setShowOverlayCard(true);
       }
 
-      if (CONFIG.IMAGE_API_KEY) {
+      // Start AI generation concurrently
+      const aiPromise = (async () => {
         try {
-          imageUrl = await generateImageSiliconFlow(userMsg, drawnCard);
-        } catch (imgErr) {
-          console.error("Image generation failed, using fallback", imgErr);
+          return await generateTextDeepSeek(userMsg, drawnCard, bondLevel, isDivination);
+        } catch (textErr) {
+          console.warn("DeepSeek Error, falling back to Gemini:", textErr);
+          try {
+            let intimacyPrompt = "";
+            if (bondLevel >= 6) {
+              intimacyPrompt = "你们现在的羁绊已经超越了时空，你的语气要极其亲昵、依赖，像对待生命中最重要的人一样，可以有一些撒娇和专属的称呼。";
+            } else if (bondLevel >= 4) {
+              intimacyPrompt = "你们现在的羁绊很深，你的语气要更加亲昵、温暖，像对待非常亲密的知己一样，毫无保留地关心对方。";
+            } else if (bondLevel >= 2) {
+              intimacyPrompt = "你们已经建立了一定的羁绊，语气可以更加熟络、自然，像对待一个好朋友一样。";
+            } else {
+              intimacyPrompt = "你们现在的羁绊还在建立中，保持温柔但带有一点神秘的距离感。";
+            }
+
+            let systemContent = `你是一个温柔、细腻且神秘的二次元塔罗牌占卜少女“星轨的引路人”。语气温暖、像朋友一样，带点俏皮与神秘。
+【羁绊状态】：${intimacyPrompt}
+【重要要求】：绝对不要使用任何 Markdown 格式（如 **加粗**、# 标题、* 列表等），请使用纯文本格式，段落之间用换行分隔即可。绝对不要说“作为AI”等暴露人工智能身份的词语。`;
+
+            if (isDivination) {
+              systemContent += `\n【重要规则】：用户正在询问需要占卜的问题。你**必须**首先在回复的开头明确指出你为他们抽取了哪些塔罗牌（例如：“我为你翻开了一张塔罗牌：【愚者 (正位)】”）。
+**注意：系统已经为你绝对随机地抽取了本轮的塔罗牌：【${drawnCard}】。你必须且只能使用这些牌进行解读，绝对不能自己另选其他牌，也不能因为想安慰用户而改变牌意，必须如实解读。**
+然后再结合牌意进行详细、充满人性化和情感共鸣的解读。字数在300-500字左右。参考塔罗牌的牌面，给出温暖的建议和指引，像一个真实的倾听者一样去理解用户的感受。`;
+            } else {
+              systemContent += `\n【重要规则】：用户只是在和你日常聊天，并没有要求占卜。请用温柔的少女口吻自然地回应他们，字数可以稍微短一些，保持人设，**绝对不要**主动去抽牌或强行解读塔罗牌，除非用户明确要求。`;
+            }
+
+            const response = await ai.models.generateContent({
+              model: 'gemini-3.1-pro-preview',
+              contents: `User says: ${userMsg}`,
+              config: {
+                systemInstruction: systemContent
+              }
+            });
+            let text = response.text || "星轨受到了干扰，无法听清你的声音...";
+            return text.replace(/\*\*/g, '').replace(/#/g, '');
+          } catch (fallbackErr) {
+            console.error("Gemini Fallback Error:", fallbackErr);
+            return "星轨受到了干扰，无法听清你的声音...";
+          }
         }
-      } else {
-        await new Promise(resolve => setTimeout(resolve, 1500));
+      })();
+
+      if (isDivination) {
+        // Wait for animation to finish
+        await new Promise(resolve => setTimeout(resolve, 3500));
+        setShowOverlayCard(false);
+        
+        // Wait a tiny bit for the fade out
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      if (settings.voiceEnabled && CONFIG.MINIMAX_API_KEY && CONFIG.MINIMAX_GROUP_ID) {
+      // Wait for AI text if it's not done yet
+      aiText = await aiPromise;
+
+      if (settings.voiceEnabled) {
         playVoiceMiniMax(aiText, audioRef.current);
       }
 
-      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'ai', text: aiText, timestamp: Date.now() }]);
-      setCardImage(imageUrl);
+      setMessages(prev => [...prev, { 
+        id: crypto.randomUUID(), 
+        role: 'ai', 
+        text: aiText, 
+        timestamp: Date.now(), 
+        cardImage: isDivination ? imageUrl : undefined 
+      }]);
+      
+      if (isDivination) {
+        setCardImage(imageUrl);
+      }
       setIsDrawing(false);
       setIsThinking(false);
 
@@ -404,8 +494,11 @@ export default function Home() {
         setTimeout(() => {
           setShowFragmentDrop(drop);
           setFragments(prev => {
-            if (!prev.find(p => p.id === drop.id)) return [...prev, drop];
-            return prev;
+            const existing = prev.find(p => p.id === drop.id);
+            if (existing) {
+              return prev.map(p => p.id === drop.id ? { ...p, count: (p.count || 1) + 1 } : p);
+            }
+            return [...prev, { ...drop, count: 1 }];
           });
         }, 1000);
       }
@@ -422,44 +515,44 @@ export default function Home() {
   const progressPercent = Math.min(100, (bondExp / nextLevelExp) * 100);
 
   return (
-    <div ref={containerRef} className="h-full flex flex-col relative overflow-hidden" onClick={unlockAudio}>
+    <div ref={containerRef} className="h-full flex flex-col relative overflow-hidden">
       {/* Top Header */}
-      <header className="px-6 pt-8 pb-4 flex justify-between items-center z-20">
+      <header className="px-6 pt-4 pb-4 flex justify-between items-center z-20">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <span className="bg-[#007AFF]/10 dark:bg-blue-500/20 text-[#007AFF] dark:text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full border border-[#007AFF]/20 dark:border-blue-500/30">
+            <span className="bg-[#6B8AFF]/20 text-[#6B8AFF] text-xs font-bold px-2 py-0.5 rounded-full border border-[#6B8AFF]/30">
               LV.{bondLevel}
             </span>
-            <span className="font-serif text-lg font-semibold tracking-wide text-[#1D1D1F] dark:text-gray-100">
+            <span className="font-sans text-lg font-bold tracking-wide text-apple-text">
               {LEVEL_TITLES[bondLevel - 1]}
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-32 h-1.5 bg-black/5 dark:bg-white/10 rounded-full overflow-hidden">
+            <div className="w-32 h-1.5 bg-apple-surface-hover rounded-full overflow-hidden">
               <motion.div 
-                className="h-full bg-gradient-to-r from-[#007AFF]/50 to-[#007AFF] dark:from-blue-500/50 dark:to-blue-400"
+                className="h-full bg-gradient-to-r from-[#6B8AFF]/50 to-[#6B8AFF]"
                 initial={{ width: 0 }}
                 animate={{ width: `${progressPercent}%` }}
                 transition={{ duration: 1, ease: "easeOut" }}
               />
             </div>
-            <span className="text-[10px] text-[#8E8E93] dark:text-gray-400 font-mono">{bondExp}/{nextLevelExp}</span>
+            <span className="text-[10px] text-apple-text-muted font-mono">{bondExp}/{nextLevelExp}</span>
           </div>
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-[#007AFF] dark:text-blue-400 bg-[#007AFF]/10 dark:bg-blue-500/20 px-3 py-1.5 rounded-full border border-[#007AFF]/20 dark:border-blue-500/30">
+          <div className="flex items-center gap-1.5 text-apple-accent bg-apple-accent/10 px-3 py-1.5 rounded-full border border-apple-accent/20">
             <Sparkles size={14} />
             <span className="text-xs font-medium">{energy}</span>
           </div>
-          <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2 rounded-full bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors border border-black/5 dark:border-white/10" title="切换主题">
-            {theme === 'dark' ? <Sun size={16} className="text-yellow-400" /> : <Moon size={16} className="text-[#8E8E93]" />}
+          <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2 rounded-full bg-apple-surface hover:bg-apple-surface-hover transition-colors border border-apple-border" title="切换昼夜模式">
+            {theme === 'dark' ? <Sun size={16} className="text-apple-text-muted" /> : <Moon size={16} className="text-apple-text-muted" />}
           </button>
-          <button onClick={() => setShowClearConfirm(true)} className="p-2 rounded-full bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors border border-black/5 dark:border-white/10" title="清除记忆">
-            <Trash2 size={16} className="text-[#8E8E93] dark:text-gray-400" />
+          <button onClick={() => setShowClearConfirm(true)} className="p-2 rounded-full bg-apple-surface hover:bg-apple-surface-hover transition-colors border border-apple-border" title="清除记忆">
+            <Trash2 size={16} className="text-apple-text-muted" />
           </button>
-          <button onClick={() => setShowRules(true)} className="p-2 rounded-full bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition-colors border border-black/5 dark:border-white/10" title="星轨法则">
-            <BookOpen size={16} className="text-[#8E8E93] dark:text-gray-400" />
+          <button onClick={() => setShowRules(true)} className="p-2 rounded-full bg-apple-surface hover:bg-apple-surface-hover transition-colors border border-apple-border" title="星轨法则">
+            <BookOpen size={16} className="text-apple-text-muted" />
           </button>
         </div>
       </header>
@@ -480,7 +573,7 @@ export default function Home() {
               exit={{ opacity: 0, scale: 0.9, height: 0, margin: 0 }}
               className="w-full flex justify-center py-4 relative"
             >
-              <div className="relative w-48 h-72 rounded-2xl overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.15)] border border-black/5 dark:border-white/10 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md flex flex-col items-center justify-center group">
+              <div className="relative w-48 h-72 rounded-2xl overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.4)] border border-apple-border bg-apple-surface backdrop-blur-md flex flex-col items-center justify-center group">
                 <AnimatePresence mode="wait">
                   <motion.img 
                     key={cardImage}
@@ -499,7 +592,7 @@ export default function Home() {
                     onClick={handleCardClick}
                     className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105 cursor-pointer"
                     onError={(e) => {
-                      e.currentTarget.src = "/default-card.png";
+                      e.currentTarget.src = "default-card.png";
                     }}
                   />
                 </AnimatePresence>
@@ -523,7 +616,7 @@ export default function Home() {
                         alert('已成功发布到星轨社区！');
                       }
                     }}
-                    className="p-1.5 bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-black/40 transition-colors"
+                    className="p-1.5 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-black/60 transition-colors"
                     title="发布到社区"
                   >
                     <Sparkles size={14} />
@@ -537,14 +630,14 @@ export default function Home() {
                         handleCopy(cardImage);
                       }
                     }}
-                    className="p-1.5 bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-black/40 transition-colors"
+                    className="p-1.5 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-black/60 transition-colors"
                     title="分享"
                   >
                     <Share size={14} />
                   </button>
                   <button 
                     onClick={() => setFullScreenImage(cardImage)}
-                    className="p-1.5 bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-black/40 transition-colors"
+                    className="p-1.5 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-black/60 transition-colors"
                     title="全屏查看"
                   >
                     <Maximize2 size={14} />
@@ -557,38 +650,38 @@ export default function Home() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="absolute inset-0 bg-white/60 backdrop-blur-md flex flex-col items-center justify-center overflow-hidden z-20"
+                      className="absolute inset-0 bg-apple-surface backdrop-blur-md flex flex-col items-center justify-center overflow-hidden z-20"
                     >
                       {/* Outer Rotating Magic Circle */}
                       <motion.div 
                         animate={{ rotate: 360 }}
                         transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-                        className="absolute w-48 h-48 border-[1px] border-[#007AFF]/20 rounded-full flex items-center justify-center"
+                        className="absolute w-48 h-48 border-[1px] border-[#6B8AFF]/20 rounded-full flex items-center justify-center"
                       >
                         {/* Hexagram pattern */}
-                        <div className="absolute w-full h-full border-[1px] border-[#007AFF]/10 rotate-45"></div>
-                        <div className="absolute w-full h-full border-[1px] border-[#007AFF]/10 rotate-[135deg]"></div>
+                        <div className="absolute w-full h-full border-[1px] border-[#6B8AFF]/10 rotate-45"></div>
+                        <div className="absolute w-full h-full border-[1px] border-[#6B8AFF]/10 rotate-[135deg]"></div>
                       </motion.div>
                       
                       {/* Inner Rotating Dashed Ring */}
                       <motion.div 
                         animate={{ rotate: -360 }}
                         transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-                        className="absolute w-32 h-32 border-2 border-dashed border-[#007AFF]/30 rounded-full"
+                        className="absolute w-32 h-32 border-2 border-dashed border-[#6B8AFF]/30 rounded-full"
                       />
                       
                       {/* Pulsing Core */}
                       <motion.div 
                         animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.8, 0.3] }}
                         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute w-16 h-16 bg-gradient-to-tr from-[#007AFF]/20 to-[#FFD1E8]/40 rounded-full blur-xl"
+                        className="absolute w-16 h-16 bg-gradient-to-tr from-[#6B8AFF]/20 to-[#D4AF37]/40 rounded-full blur-xl"
                       />
                       
                       {/* Center Icon */}
                       <motion.div
                         animate={{ y: [0, -5, 0] }}
                         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                        className="z-10 text-[#007AFF]"
+                        className="z-10 text-[#6B8AFF]"
                       >
                         <Sparkles size={28} />
                       </motion.div>
@@ -597,15 +690,15 @@ export default function Home() {
                       <motion.div 
                         animate={{ y: [-10, -30], opacity: [0, 1, 0] }}
                         transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut", delay: 0.2 }}
-                        className="absolute w-1 h-1 bg-[#007AFF] rounded-full top-1/2 left-1/3"
+                        className="absolute w-1 h-1 bg-[#6B8AFF] rounded-full top-1/2 left-1/3"
                       />
                       <motion.div 
                         animate={{ y: [-10, -40], opacity: [0, 1, 0] }}
                         transition={{ duration: 2, repeat: Infinity, ease: "easeOut", delay: 0.7 }}
-                        className="absolute w-1.5 h-1.5 bg-[#FFD1E8] rounded-full top-1/2 right-1/3"
+                        className="absolute w-1.5 h-1.5 bg-[#D4AF37] rounded-full top-1/2 right-1/3"
                       />
 
-                      <span className="absolute bottom-8 text-[11px] font-serif text-[#007AFF] tracking-[0.2em] font-medium drop-shadow-sm">命运召唤中...</span>
+                      <span className="absolute bottom-8 text-[11px] font-serif text-[#6B8AFF] tracking-[0.2em] font-medium drop-shadow-sm">命运召唤中...</span>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -615,7 +708,7 @@ export default function Home() {
                     initial={{ opacity: 0, y: 0 }}
                     animate={{ opacity: 1, y: -40 }}
                     exit={{ opacity: 0 }}
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#007AFF] font-bold text-xl drop-shadow-md"
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#6B8AFF] font-bold text-xl drop-shadow-md"
                   >
                     +{floatingExp} EXP
                   </motion.div>
@@ -625,7 +718,7 @@ export default function Home() {
               {/* Toggle Card Button */}
               <button 
                 onClick={() => setShowCard(false)}
-                className="absolute -bottom-2 bg-white/80 backdrop-blur-xl border border-black/5 shadow-sm rounded-full p-1.5 text-[#8E8E93] hover:text-[#1D1D1F] transition-colors"
+                className="absolute -bottom-2 bg-apple-surface backdrop-blur-xl border border-apple-border shadow-sm rounded-full p-1.5 text-apple-text-muted hover:text-apple-text transition-colors"
               >
                 <ChevronDown size={16} />
               </button>
@@ -637,7 +730,7 @@ export default function Home() {
           <div className="w-full flex justify-center">
             <button 
               onClick={() => setShowCard(true)}
-              className="text-xs text-[#8E8E93] dark:text-gray-400 hover:text-[#007AFF] dark:hover:text-blue-400 transition-colors flex items-center gap-1 py-2"
+              className="text-xs text-apple-text-muted hover:text-[#6B8AFF] transition-colors flex items-center gap-1 py-2"
             >
               <Sparkles size={12} /> 显示角色区域
             </button>
@@ -657,20 +750,30 @@ export default function Home() {
               )}
             >
               <div className={clsx(
-                "rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm whitespace-pre-wrap",
+                "rounded-2xl px-5 py-3.5 text-[15px] leading-relaxed shadow-sm whitespace-pre-wrap",
                 msg.role === 'user' 
-                  ? "bg-[#007AFF] text-white rounded-tr-sm" 
-                  : "glass-panel bg-white/80 dark:bg-gray-800/80 text-[#1D1D1F] dark:text-gray-100 rounded-tl-sm font-serif text-[15px] ai-text border border-black/5 dark:border-white/10"
+                  ? "bg-[#6B8AFF] text-white rounded-tr-sm shadow-[0_4px_16px_rgba(107,138,255,0.3)]" 
+                  : "bg-apple-surface backdrop-blur-xl text-apple-text rounded-tl-sm font-sans border border-apple-border"
               )}>
+                {msg.cardImage && msg.cardImage !== 'default-card.png' && msg.cardImage !== '/default-card.png' && (
+                  <div className="mb-3 flex justify-center">
+                    <img 
+                      src={msg.cardImage} 
+                      alt="Drawn Tarot Card" 
+                      className="w-32 h-48 object-cover rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.4)] border border-apple-border cursor-pointer hover:scale-105 transition-transform"
+                      onClick={() => setFullScreenImage(msg.cardImage!)}
+                    />
+                  </div>
+                )}
                 {msg.text}
               </div>
               
               {msg.role === 'ai' && (
                 <div className="flex items-center gap-2 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => handleCopy(msg.text)} className="p-1 text-black/40 dark:text-white/40 hover:text-[#007AFF] dark:hover:text-blue-400 transition-colors" title="复制">
+                  <button onClick={() => handleCopy(msg.text)} className="p-1 text-apple-text-muted/40 hover:text-[#6B8AFF] transition-colors" title="复制">
                     <Copy size={12} />
                   </button>
-                  <button onClick={() => handleRegenerate(msg.id)} disabled={isDrawing || isThinking} className="p-1 text-black/40 dark:text-white/40 hover:text-[#007AFF] dark:hover:text-blue-400 transition-colors disabled:opacity-30" title="重新生成">
+                  <button onClick={() => handleRegenerate(msg.id)} disabled={isDrawing || isThinking} className="p-1 text-apple-text-muted/40 hover:text-[#6B8AFF] transition-colors disabled:opacity-30" title="重新生成">
                     <RefreshCw size={12} />
                   </button>
                 </div>
@@ -681,11 +784,11 @@ export default function Home() {
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="self-start glass-panel bg-white/80 dark:bg-gray-800/80 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5 border border-black/5 dark:border-white/10"
+              className="self-start bg-apple-surface backdrop-blur-xl rounded-2xl rounded-tl-sm px-5 py-4 flex items-center gap-1.5 border border-apple-border"
             >
-              <motion.div animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0 }} className="w-1.5 h-1.5 bg-[#007AFF]/60 dark:bg-blue-400/60 rounded-full" />
-              <motion.div animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} className="w-1.5 h-1.5 bg-[#007AFF]/60 dark:bg-blue-400/60 rounded-full" />
-              <motion.div animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }} className="w-1.5 h-1.5 bg-[#007AFF]/60 dark:bg-blue-400/60 rounded-full" />
+              <motion.div animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0 }} className="w-1.5 h-1.5 bg-[#6B8AFF]/80 rounded-full" />
+              <motion.div animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} className="w-1.5 h-1.5 bg-[#6B8AFF]/80 rounded-full" />
+              <motion.div animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }} className="w-1.5 h-1.5 bg-[#6B8AFF]/80 rounded-full" />
             </motion.div>
           )}
           <div ref={chatEndRef} className="h-32 shrink-0" />
@@ -714,16 +817,16 @@ export default function Home() {
                   initial={{ opacity: 0, scale: 0.8, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.8, y: 10 }}
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[150px] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm text-[#8E7AB5] dark:text-purple-300 text-xs font-medium px-3 py-2 rounded-2xl shadow-lg border border-[#E4D5F2]/50 dark:border-purple-500/30 pointer-events-none"
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[150px] bg-apple-surface backdrop-blur-sm text-[#6B8AFF] text-xs font-medium px-3 py-2 rounded-2xl shadow-lg border border-apple-border pointer-events-none"
                 >
                   {petMessage}
                   {/* Speech bubble arrow */}
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-4 border-transparent border-t-white/90 dark:border-t-gray-800/90" />
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-4 border-transparent border-t-[#141419]/90" />
                 </motion.div>
               )}
             </AnimatePresence>
             <img 
-              src="/default-pet.png" 
+              src="default-pet.png" 
               alt="Guide" 
               className="w-28 h-28 object-contain drop-shadow-2xl pointer-events-none"
               referrerPolicy="no-referrer"
@@ -741,7 +844,7 @@ export default function Home() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.9 }}
               onClick={scrollToTop}
-              className="absolute -top-12 right-6 p-2 rounded-full bg-black/5 text-black/30 hover:bg-black/10 hover:text-black/50 backdrop-blur-md transition-all z-30 border border-black/5 shadow-sm"
+              className="absolute -top-12 right-6 p-2 rounded-full bg-apple-surface text-apple-text-muted hover:bg-apple-surface hover:text-apple-text backdrop-blur-md transition-all z-30 border border-apple-border shadow-sm"
               title="回到顶部"
             >
               <ArrowUp size={16} />
@@ -756,7 +859,7 @@ export default function Home() {
                 key={`quick-${idx}`}
                 onClick={() => handleSend(prompt)}
                 disabled={isDrawing || isThinking}
-                className="whitespace-nowrap px-3 py-1.5 rounded-full glass-pill text-xs text-[#8E8E93] hover:text-[#1D1D1F] hover:border-black/10 transition-all disabled:opacity-50"
+                className="whitespace-nowrap px-3 py-1.5 rounded-full bg-apple-surface border border-apple-border text-xs text-apple-text-muted hover:text-apple-text hover:border-apple-border transition-all disabled:opacity-50"
               >
                 {prompt}
               </button>
@@ -768,7 +871,7 @@ export default function Home() {
                 key={`spread-${idx}`}
                 onClick={() => handleSend(spread.prompt)}
                 disabled={isDrawing || isThinking}
-                className="whitespace-nowrap px-3 py-1.5 rounded-full bg-[#007AFF]/10 border border-[#007AFF]/20 text-xs text-[#007AFF] hover:bg-[#007AFF]/20 transition-all disabled:opacity-50 flex items-center gap-1"
+                className="whitespace-nowrap px-3 py-1.5 rounded-full bg-[#6B8AFF]/10 border border-[#6B8AFF]/20 text-xs text-[#6B8AFF] hover:bg-[#6B8AFF]/20 transition-all disabled:opacity-50 flex items-center gap-1"
               >
                 <Sparkles size={10} /> {spread.name}
               </button>
@@ -784,24 +887,66 @@ export default function Home() {
             onKeyDown={e => e.key === 'Enter' && handleSend()}
             disabled={isDrawing || isThinking}
             placeholder="倾诉你的心事..."
-            className="w-full bg-white/60 backdrop-blur-xl border border-black/5 rounded-full py-3.5 pl-5 pr-12 text-sm text-[#1D1D1F] placeholder:text-black/30 focus:outline-none focus:border-[#007AFF]/50 transition-colors shadow-sm"
+            className="w-full bg-apple-surface backdrop-blur-xl border border-apple-border rounded-full py-3.5 pl-5 pr-12 text-sm text-apple-text placeholder:text-apple-text-muted focus:outline-none focus:border-apple-accent/50 transition-colors shadow-[0_4px_20px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]"
           />
           <button 
             onClick={() => handleSend()}
             disabled={!inputText.trim() || isDrawing || isThinking}
-            className="absolute right-1.5 p-2.5 rounded-full bg-[#007AFF] text-white disabled:bg-black/5 disabled:text-black/30 transition-colors shadow-sm"
+            className="absolute right-1.5 w-9 h-9 rounded-full bg-[#6B8AFF] text-white flex items-center justify-center disabled:opacity-50 disabled:bg-apple-surface-hover transition-colors shadow-[0_0_15px_rgba(107,138,255,0.4)]"
           >
-            <Send size={16} className={inputText.trim() && !isDrawing ? "translate-x-[-1px] translate-y-[1px]" : ""} />
+            <Send size={16} className="ml-0.5" />
           </button>
         </div>
       </div>
+
+      {/* Card Overlay Animation */}
+      <AnimatePresence>
+        {showOverlayCard && overlayCardImage && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 50 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none"
+          >
+            {overlayCardName && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+                className="mb-6 px-6 py-2 rounded-full bg-black/60 backdrop-blur-md text-white font-serif text-lg tracking-widest shadow-lg border border-apple-border"
+              >
+                {overlayCardName}
+              </motion.div>
+            )}
+            <motion.div
+              animate={{ 
+                y: [0, -10, 0],
+                boxShadow: [
+                  "0 20px 40px rgba(0,0,0,0.2)",
+                  "0 30px 60px rgba(255,255,255,0.4)",
+                  "0 20px 40px rgba(0,0,0,0.2)"
+                ]
+              }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="relative w-64 h-96 rounded-2xl overflow-hidden shadow-2xl border border-apple-border"
+            >
+              <img 
+                src={overlayCardImage} 
+                alt="Drawn Tarot Card" 
+                className="w-full h-full object-cover"
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modals */}
       <AnimatePresence>
         {fullScreenImage && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[100] bg-black/20 backdrop-blur-2xl flex items-center justify-center p-4"
+            className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-2xl flex items-center justify-center p-4"
             onClick={() => setFullScreenImage(null)}
           >
             <div className="absolute top-6 right-6 flex gap-4 z-10">
@@ -814,12 +959,12 @@ export default function Home() {
                     handleCopy(fullScreenImage);
                   }
                 }} 
-                className="p-2 bg-black/5 rounded-full text-black/50 hover:text-[#1D1D1F] hover:bg-black/10 transition-colors"
+                className="p-2 bg-apple-surface-hover rounded-full text-apple-text-muted hover:text-apple-text hover:bg-apple-surface-hover transition-colors"
                 title="分享"
               >
                 <Share size={20} />
               </button>
-              <button onClick={() => setFullScreenImage(null)} className="p-2 bg-black/5 rounded-full text-black/50 hover:text-[#1D1D1F] hover:bg-black/10 transition-colors">
+              <button onClick={() => setFullScreenImage(null)} className="p-2 bg-apple-surface-hover rounded-full text-apple-text-muted hover:text-apple-text hover:bg-apple-surface-hover transition-colors">
                 <X size={24} />
               </button>
             </div>
@@ -839,19 +984,19 @@ export default function Home() {
         {showFragmentDrop && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 bg-black/20 backdrop-blur-xl flex items-center justify-center p-6"
+            className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-sm glass-panel p-8 flex flex-col items-center text-center border-black/5 shadow-xl"
+              className="w-full max-w-sm bg-apple-surface backdrop-blur-xl rounded-3xl p-8 flex flex-col items-center text-center border border-apple-border shadow-2xl"
             >
-              <h3 className="font-serif text-2xl text-[#007AFF] mb-6">获得碎片</h3>
+              <h3 className="font-sans font-bold text-2xl text-[#6B8AFF] mb-6">获得碎片</h3>
               <div className="text-6xl mb-4 drop-shadow-md">{showFragmentDrop.icon}</div>
-              <div className="text-lg font-medium mb-2 text-[#1D1D1F]">[{showFragmentDrop.rarity}] {showFragmentDrop.name}</div>
-              <p className="text-sm text-[#8E8E93] mb-8">{showFragmentDrop.desc}</p>
+              <div className="text-lg font-medium mb-2 text-apple-text">[{showFragmentDrop.rarity}] {showFragmentDrop.name}</div>
+              <p className="text-sm text-apple-text-muted mb-8">{showFragmentDrop.desc}</p>
               <button 
                 onClick={() => setShowFragmentDrop(null)}
-                className="w-full py-3 rounded-xl bg-[#007AFF] text-white font-semibold shadow-md"
+                className="w-full py-3 rounded-xl bg-[#6B8AFF] text-white font-semibold shadow-[0_4px_15px_rgba(107,138,255,0.3)] hover:bg-[#4F46E5] transition-colors"
               >
                 收下
               </button>
@@ -862,27 +1007,27 @@ export default function Home() {
         {showLevelUp && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 bg-black/20 backdrop-blur-xl flex items-center justify-center p-6"
+            className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-sm glass-panel p-8 flex flex-col items-center text-center border-black/5 shadow-xl"
+              className="w-full max-w-sm bg-apple-surface backdrop-blur-xl rounded-3xl p-8 flex flex-col items-center text-center border border-apple-border shadow-2xl"
             >
-              <h3 className="font-serif text-2xl text-[#007AFF] mb-2">羁绊升级</h3>
-              <p className="text-[#1D1D1F] mb-6">
+              <h3 className="font-sans font-bold text-2xl text-[#6B8AFF] mb-2">羁绊升级</h3>
+              <p className="text-apple-text mb-6">
                 你与少女的羁绊达到了 <br/>
-                <span className="text-lg font-bold text-[#007AFF] mt-1 block">LV.{bondLevel} {LEVEL_TITLES[bondLevel-1]}</span>
+                <span className="text-lg font-bold text-[#6B8AFF] mt-1 block">LV.{bondLevel} {LEVEL_TITLES[bondLevel-1]}</span>
               </p>
-              <div className="w-full bg-black/5 rounded-xl p-4 mb-6 text-sm text-left border border-black/5">
+              <div className="w-full bg-apple-surface rounded-xl p-4 mb-6 text-sm text-left border border-apple-border">
                 <div className="text-[#34C759] mb-2 font-medium">✨ +5 免费占卜次数</div>
                 {bondLevel === 2 && <div className="text-[#AF52DE] font-medium">🔓 解锁: SR碎片掉落率提升</div>}
                 {bondLevel === 3 && <div className="text-[#FF9500] font-medium">🔓 解锁: SSR碎片掉落率提升</div>}
-                {bondLevel === 4 && <div className="text-[#007AFF] font-medium">🔓 解锁: 盲盒保底机制</div>}
+                {bondLevel === 4 && <div className="text-[#6B8AFF] font-medium">🔓 解锁: 盲盒保底机制</div>}
                 {bondLevel >= 5 && <div className="text-[#FF2D55] font-medium">🔓 解锁: 更亲密的专属对话语气</div>}
               </div>
               <button 
                 onClick={() => { setEnergy(e => e + 5); setShowLevelUp(false); }}
-                className="w-full py-3 rounded-xl bg-[#007AFF] text-white font-semibold shadow-md"
+                className="w-full py-3 rounded-xl bg-[#6B8AFF] text-white font-semibold shadow-[0_4px_15px_rgba(107,138,255,0.3)] hover:bg-[#4F46E5] transition-colors"
               >
                 确认
               </button>
@@ -893,26 +1038,26 @@ export default function Home() {
         {showClearConfirm && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 bg-black/20 backdrop-blur-xl flex items-center justify-center p-6"
+            className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-sm glass-panel p-8 flex flex-col items-center text-center border-black/5 shadow-xl"
+              className="w-full max-w-sm bg-apple-surface backdrop-blur-xl rounded-3xl p-8 flex flex-col items-center text-center border border-apple-border shadow-2xl"
             >
-              <h3 className="font-serif text-2xl text-[#1D1D1F] mb-4">清除记忆</h3>
-              <p className="text-[#8E8E93] mb-8 text-sm">
+              <h3 className="font-sans font-bold text-2xl text-apple-text mb-4">清除记忆</h3>
+              <p className="text-apple-text-muted mb-8 text-sm">
                 确定要清除所有对话记忆吗？此操作不可逆，但不会清除你的羁绊等级和碎片。
               </p>
               <div className="flex w-full gap-3">
                 <button 
                   onClick={() => setShowClearConfirm(false)}
-                  className="flex-1 py-3 rounded-xl bg-black/5 text-[#1D1D1F] font-semibold hover:bg-black/10 transition-colors"
+                  className="flex-1 py-3 rounded-xl bg-apple-surface text-apple-text-muted font-semibold hover:bg-apple-surface-hover hover:text-apple-text transition-colors border border-apple-border"
                 >
                   取消
                 </button>
                 <button 
                   onClick={handleClearHistory}
-                  className="flex-1 py-3 rounded-xl bg-[#FF3B30] text-white font-semibold shadow-md hover:bg-[#FF3B30]/90 transition-colors"
+                  className="flex-1 py-3 rounded-xl bg-rose-500/20 text-rose-400 font-semibold shadow-[0_4px_15px_rgba(244,63,94,0.2)] hover:bg-rose-500/30 border border-rose-500/30 transition-colors"
                 >
                   确认清除
                 </button>
@@ -924,20 +1069,20 @@ export default function Home() {
         {showPaywall && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 bg-black/20 backdrop-blur-xl flex items-center justify-center p-6"
+            className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-sm glass-panel p-8 flex flex-col items-center text-center relative border-black/5 shadow-xl"
+              className="w-full max-w-sm bg-apple-surface backdrop-blur-xl rounded-3xl p-8 flex flex-col items-center text-center relative border border-apple-border shadow-2xl"
             >
-              <button onClick={() => setShowPaywall(false)} className="absolute top-4 right-4 text-black/40 hover:text-[#1D1D1F]"><X size={20}/></button>
-              <h3 className="font-serif text-2xl text-[#1D1D1F] mb-2">能量耗尽</h3>
-              <p className="text-[#8E8E93] text-sm mb-8 leading-relaxed">
+              <button onClick={() => setShowPaywall(false)} className="absolute top-4 right-4 text-apple-text-muted hover:text-apple-text transition-colors"><X size={20}/></button>
+              <h3 className="font-sans font-bold text-2xl text-apple-text mb-2">能量耗尽</h3>
+              <p className="text-apple-text-muted text-sm mb-8 leading-relaxed">
                 免费的占卜次数已用完。<br/>星轨需要更多的能量来维持连接...
               </p>
               <button 
                 onClick={() => { setEnergy(5); setShowPaywall(false); }}
-                className="w-full py-3 rounded-xl bg-black/5 hover:bg-black/10 border border-black/10 text-[#1D1D1F] font-medium transition-colors"
+                className="w-full py-3 rounded-xl bg-apple-surface hover:bg-apple-surface-hover border border-apple-border text-apple-text font-medium transition-colors"
               >
                 补充能量 (测试用+5)
               </button>
@@ -948,27 +1093,27 @@ export default function Home() {
         {showRules && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 bg-black/20 backdrop-blur-xl flex items-center justify-center p-6"
+            className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-              className="w-full max-w-sm glass-panel p-6 flex flex-col relative border-black/5 shadow-xl"
+              className="w-full max-w-sm bg-apple-surface backdrop-blur-xl rounded-3xl p-6 flex flex-col relative border border-apple-border shadow-2xl"
             >
-              <button onClick={() => setShowRules(false)} className="absolute top-4 right-4 text-black/40 hover:text-[#1D1D1F]"><X size={20}/></button>
-              <h3 className="font-serif text-xl text-[#1D1D1F] mb-6 text-center">星轨法则</h3>
+              <button onClick={() => setShowRules(false)} className="absolute top-4 right-4 text-apple-text-muted hover:text-apple-text transition-colors"><X size={20}/></button>
+              <h3 className="font-sans font-bold text-xl text-apple-text mb-6 text-center">星轨法则</h3>
               
               <div className="flex flex-col gap-4 text-sm">
-                <div className="bg-black/5 p-3 rounded-lg border border-black/5">
-                  <div className="font-medium text-[#1D1D1F] mb-1">占卜规则</div>
-                  <div className="text-[#8E8E93] leading-relaxed">初始拥有 5 次免费占卜机会。每次占卜将消耗 1 次机会并增加羁绊经验。</div>
+                <div className="bg-apple-surface p-3 rounded-lg border border-apple-border">
+                  <div className="font-medium text-apple-text mb-1">占卜规则</div>
+                  <div className="text-apple-text-muted leading-relaxed">初始拥有 5 次免费占卜机会。每次占卜将消耗 1 次机会并增加羁绊经验。</div>
                 </div>
-                <div className="bg-black/5 p-3 rounded-lg border border-black/5">
-                  <div className="font-medium text-[#1D1D1F] mb-1">盲盒掉落</div>
-                  <div className="text-[#8E8E93] leading-relaxed">占卜后有几率掉落记忆碎片。分为 N, R, SR, SSR 四个稀有度。</div>
+                <div className="bg-apple-surface p-3 rounded-lg border border-apple-border">
+                  <div className="font-medium text-apple-text mb-1">盲盒掉落</div>
+                  <div className="text-apple-text-muted leading-relaxed">占卜后有几率掉落记忆碎片。分为 N, R, SR, SSR 四个稀有度。</div>
                 </div>
-                <div className="bg-black/5 p-3 rounded-lg border border-black/5">
-                  <div className="font-medium text-[#1D1D1F] mb-1">羁绊升级</div>
-                  <div className="text-[#8E8E93] leading-relaxed">升级可获得免费次数，并提升高稀有度碎片的掉落概率！</div>
+                <div className="bg-apple-surface p-3 rounded-lg border border-apple-border">
+                  <div className="font-medium text-apple-text mb-1">羁绊升级</div>
+                  <div className="text-apple-text-muted leading-relaxed">升级可获得免费次数，并提升高稀有度碎片的掉落概率！</div>
                 </div>
               </div>
             </motion.div>

@@ -27,69 +27,47 @@ export interface Message {
   role: 'user' | 'ai';
   text: string;
   timestamp: number;
+  cardImage?: string;
 }
 
-export interface Comment {
-  id: number;
-  user: { name: string; avatar: string | null };
+export interface UserProfile {
+  id: string;
+  name: string;
+  gender: 'male' | 'female';
+  birthDate: string;
+  birthTime: string;
+  birthLocation: string;
+  currentLocation: string;
+}
+
+export interface SimulatorState {
+  dilemma: string;
+  choiceA: string;
+  choiceB: string;
+  result: any | null;
+}
+
+export interface DiaryEntry {
+  id: string;
+  date: string;
+  mood: 'great' | 'good' | 'neutral' | 'bad' | 'awful';
   content: string;
-  time: string;
+  tags: string[];
+  aiReview?: string;
 }
 
-export interface Post {
-  id: number;
-  user: { name: string; avatar: string | null };
-  time: string;
+export interface ReviewEntry {
+  id: string;
+  date: string;
   content: string;
-  cardImage: string | null;
-  likes: number;
-  comments: number;
-  isLiked: boolean;
-  commentsList?: Comment[];
 }
 
-export const INITIAL_POSTS: Post[] = [
-  {
-    id: 1,
-    user: { name: '月下漫步', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Luna&backgroundColor=c0aede' },
-    time: '2小时前',
-    content: '今天抽到了愚者牌，引路人告诉我这意味着新的开始和无限的可能。感觉最近的迷茫一扫而空了！✨',
-    cardImage: 'https://image.pollinations.ai/prompt/the%20fool%20tarot%20card%20anime%20style%20magical?width=400&height=600&nologo=true',
-    likes: 128,
-    comments: 1,
-    isLiked: false,
-    commentsList: [
-      {
-        id: 101,
-        user: { name: '占星学徒', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Apprentice&backgroundColor=ffdfbf' },
-        content: '哇！愚者牌真的很好！祝你一切顺利！',
-        time: '1小时前'
-      }
-    ]
-  },
-  {
-    id: 2,
-    user: { name: '星尘', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Stardust&backgroundColor=b6e3f4' },
-    time: '5小时前',
-    content: '关于工作选择的占卜，命运之轮逆位。看来现在不是跳槽的好时机，需要再沉淀一下。星轨少女的解读真的很温柔，让我不再那么焦虑了。',
-    cardImage: 'https://image.pollinations.ai/prompt/wheel%20of%20fortune%20tarot%20card%20anime%20style%20magical?width=400&height=600&nologo=true',
-    likes: 85,
-    comments: 0,
-    isLiked: true,
-    commentsList: []
-  },
-  {
-    id: 3,
-    user: { name: 'Seeker', avatar: null },
-    time: '昨天',
-    content: '终于把羁绊等级升到“灵魂共振”了！解锁了新的背景音乐，太好听了呜呜呜。',
-    cardImage: null,
-    likes: 342,
-    comments: 0,
-    isLiked: false,
-    commentsList: []
-  }
-];
+export interface CompanionMessage {
+  id: string;
+  role: 'user' | 'ai';
+  text: string;
+  timestamp: number;
+}
 
 export interface AppSettings {
   voiceEnabled: boolean;
@@ -117,10 +95,30 @@ interface AppState {
   setUserName: React.Dispatch<React.SetStateAction<string>>;
   userAvatar: string | null;
   setUserAvatar: React.Dispatch<React.SetStateAction<string | null>>;
-  communityPosts: Post[];
-  setCommunityPosts: React.Dispatch<React.SetStateAction<Post[]>>;
   theme: 'light' | 'dark';
   setTheme: React.Dispatch<React.SetStateAction<'light' | 'dark'>>;
+  baziResult: any | null;
+  setBaziResult: React.Dispatch<React.SetStateAction<any | null>>;
+  baziFormData: any;
+  setBaziFormData: React.Dispatch<React.SetStateAction<any>>;
+  baziMessages: Message[];
+  setBaziMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  profiles: UserProfile[];
+  setProfiles: React.Dispatch<React.SetStateAction<UserProfile[]>>;
+  activeProfileId: string | null;
+  setActiveProfileId: React.Dispatch<React.SetStateAction<string | null>>;
+  simulatorState: SimulatorState;
+  setSimulatorState: React.Dispatch<React.SetStateAction<SimulatorState>>;
+  diaryEntries: DiaryEntry[];
+  setDiaryEntries: React.Dispatch<React.SetStateAction<DiaryEntry[]>>;
+  reviewHistory: ReviewEntry[];
+  setReviewHistory: React.Dispatch<React.SetStateAction<ReviewEntry[]>>;
+  guardianMessages: CompanionMessage[];
+  setGuardianMessages: React.Dispatch<React.SetStateAction<CompanionMessage[]>>;
+  dailyLetter: string | null;
+  setDailyLetter: React.Dispatch<React.SetStateAction<string | null>>;
+  dailyLetterDate: string | null;
+  setDailyLetterDate: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -155,7 +153,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   });
   const [cardImage, setCardImage] = useState(() => {
     const saved = localStorage.getItem('cardImage');
-    return saved ? JSON.parse(saved) : '/default-card.png';
+    return saved ? JSON.parse(saved) : 'default-card.png';
   });
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('settings');
@@ -174,14 +172,62 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const saved = localStorage.getItem('userAvatar');
     return saved ? JSON.parse(saved) : null;
   });
-  const [communityPosts, setCommunityPosts] = useState<Post[]>(() => {
-    const saved = localStorage.getItem('communityPosts');
-    return saved ? JSON.parse(saved) : INITIAL_POSTS;
-  });
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('theme');
     if (saved) return saved as 'light' | 'dark';
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+  const [baziResult, setBaziResult] = useState<any | null>(() => {
+    const saved = localStorage.getItem('baziResult');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [baziFormData, setBaziFormData] = useState<any>(() => {
+    const saved = localStorage.getItem('baziFormData');
+    const parsed = saved ? JSON.parse(saved) : null;
+    return {
+      name: parsed?.name || '',
+      gender: parsed?.gender || 'male',
+      birthDate: parsed?.birthDate || '',
+      birthTime: parsed?.birthTime || '',
+      birthLocation: parsed?.birthLocation || parsed?.location || '',
+      currentLocation: parsed?.currentLocation || ''
+    };
+  });
+  const [baziMessages, setBaziMessages] = useState<Message[]>(() => {
+    const saved = localStorage.getItem('baziMessages');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [profiles, setProfiles] = useState<UserProfile[]>(() => {
+    const saved = localStorage.getItem('profiles');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(() => {
+    const saved = localStorage.getItem('activeProfileId');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [simulatorState, setSimulatorState] = useState<SimulatorState>(() => {
+    const saved = localStorage.getItem('simulatorState');
+    return saved ? JSON.parse(saved) : { dilemma: '', choiceA: '', choiceB: '', result: null };
+  });
+  const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>(() => {
+    const saved = localStorage.getItem('diaryEntries');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [reviewHistory, setReviewHistory] = useState<ReviewEntry[]>(() => {
+    const saved = localStorage.getItem('reviewHistory');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [guardianMessages, setGuardianMessages] = useState<CompanionMessage[]>(() => {
+    const saved = localStorage.getItem('guardianMessages');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [dailyLetter, setDailyLetter] = useState<string | null>(() => {
+    const saved = localStorage.getItem('dailyLetter');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [dailyLetterDate, setDailyLetterDate] = useState<string | null>(() => {
+    const saved = localStorage.getItem('dailyLetterDate');
+    return saved ? JSON.parse(saved) : null;
   });
 
   React.useEffect(() => {
@@ -230,8 +276,48 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [userAvatar]);
 
   React.useEffect(() => {
-    localStorage.setItem('communityPosts', JSON.stringify(communityPosts));
-  }, [communityPosts]);
+    localStorage.setItem('baziResult', JSON.stringify(baziResult));
+  }, [baziResult]);
+
+  React.useEffect(() => {
+    localStorage.setItem('baziFormData', JSON.stringify(baziFormData));
+  }, [baziFormData]);
+
+  React.useEffect(() => {
+    localStorage.setItem('baziMessages', JSON.stringify(baziMessages));
+  }, [baziMessages]);
+
+  React.useEffect(() => {
+    localStorage.setItem('profiles', JSON.stringify(profiles));
+  }, [profiles]);
+
+  React.useEffect(() => {
+    localStorage.setItem('activeProfileId', JSON.stringify(activeProfileId));
+  }, [activeProfileId]);
+
+  React.useEffect(() => {
+    localStorage.setItem('simulatorState', JSON.stringify(simulatorState));
+  }, [simulatorState]);
+
+  React.useEffect(() => {
+    localStorage.setItem('diaryEntries', JSON.stringify(diaryEntries));
+  }, [diaryEntries]);
+
+  React.useEffect(() => {
+    localStorage.setItem('reviewHistory', JSON.stringify(reviewHistory));
+  }, [reviewHistory]);
+
+  React.useEffect(() => {
+    localStorage.setItem('guardianMessages', JSON.stringify(guardianMessages));
+  }, [guardianMessages]);
+
+  React.useEffect(() => {
+    localStorage.setItem('dailyLetter', JSON.stringify(dailyLetter));
+  }, [dailyLetter]);
+
+  React.useEffect(() => {
+    localStorage.setItem('dailyLetterDate', JSON.stringify(dailyLetterDate));
+  }, [dailyLetterDate]);
 
   return (
     <AppContext.Provider value={{
@@ -244,8 +330,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       settings, setSettings,
       userName, setUserName,
       userAvatar, setUserAvatar,
-      communityPosts, setCommunityPosts,
-      theme, setTheme
+      theme, setTheme,
+      baziResult, setBaziResult,
+      baziFormData, setBaziFormData,
+      baziMessages, setBaziMessages,
+      profiles, setProfiles,
+      activeProfileId, setActiveProfileId,
+      simulatorState, setSimulatorState,
+      diaryEntries, setDiaryEntries,
+      reviewHistory, setReviewHistory,
+      guardianMessages, setGuardianMessages,
+      dailyLetter, setDailyLetter,
+      dailyLetterDate, setDailyLetterDate
     }}>
       {children}
     </AppContext.Provider>
