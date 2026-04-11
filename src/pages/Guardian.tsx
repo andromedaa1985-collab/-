@@ -234,9 +234,9 @@ export default function Guardian() {
       <div className="absolute inset-0 z-0 pointer-events-none">
         <picture>
           {/* 横版图片 (图2) 放在这里的 srcSet 里 */}
-          <source media="(min-aspect-ratio: 1/1)" srcSet="/Image%20262.png" />
+          <source media="(min-aspect-ratio: 1/1)" srcSet="/image-262.png" />
           {/* 竖版图片 (图1) 放在这里的 src 里 */}
-          <img src="/Image%20259.png" alt="Guardian Background" className="w-full h-full object-cover opacity-60 dark:opacity-40" referrerPolicy="no-referrer" />
+          <img src="/image-259.png" alt="Guardian Background" className="w-full h-full object-cover opacity-60 dark:opacity-40" referrerPolicy="no-referrer" />
         </picture>
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-apple-bg/50 to-apple-bg"></div>
       </div>

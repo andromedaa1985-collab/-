@@ -366,7 +366,7 @@ export default function Home() {
 
     try {
       let aiText = "命运的星轨已经偏转...";
-      let imageUrl = "default-card.png";
+      let imageUrl = "/default-card.png";
       let drawnCard = "";
       let firstCardRaw = "";
 
@@ -592,7 +592,7 @@ export default function Home() {
                     onClick={handleCardClick}
                     className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105 cursor-pointer"
                     onError={(e) => {
-                      e.currentTarget.src = "default-card.png";
+                      e.currentTarget.src = "/default-card.png";
                     }}
                   />
                 </AnimatePresence>
@@ -826,7 +826,7 @@ export default function Home() {
               )}
             </AnimatePresence>
             <img 
-              src="default-pet.png" 
+              src="/default-pet.png" 
               alt="Guide" 
               className="w-28 h-28 object-contain drop-shadow-2xl pointer-events-none"
               referrerPolicy="no-referrer"

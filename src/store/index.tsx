@@ -153,7 +153,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   });
   const [cardImage, setCardImage] = useState(() => {
     const saved = localStorage.getItem('cardImage');
-    return saved ? JSON.parse(saved) : 'default-card.png';
+    return saved ? JSON.parse(saved) : '/default-card.png';
   });
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('settings');
