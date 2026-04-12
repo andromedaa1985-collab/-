@@ -247,7 +247,7 @@ const Landing = () => {
               </div>
             </div>
             {/* Image Placeholder */}
-            <img src="/image-280.png" alt="Bazi" className="absolute bottom-6 right-6 w-1/2 md:w-2/5 object-contain opacity-90 group-hover:scale-105 transition-transform duration-700 drop-shadow-2xl" onError={(e) => e.currentTarget.style.display = 'none'} />
+            <img src="/Image 280.png" alt="Bazi" className="absolute bottom-6 right-6 w-1/2 md:w-2/5 object-contain opacity-90 group-hover:scale-105 transition-transform duration-700 drop-shadow-2xl" onError={(e) => e.currentTarget.style.display = 'none'} />
           </motion.div>
 
           {/* Feature 2: Tarot */}
