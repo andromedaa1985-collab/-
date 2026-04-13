@@ -28,8 +28,12 @@ async function startServer() {
         body: JSON.stringify(req.body)
       });
       const data = await response.json();
+      if (data.error) {
+        console.error("DeepSeek API Error:", data.error);
+      }
       res.json(data);
     } catch (error: any) {
+      console.error("DeepSeek Proxy Error:", error);
       res.status(500).json({ error: { message: error.message } });
     }
   });
@@ -74,7 +78,9 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  const isProduction = process.env.NODE_ENV === "production" || process.env.ZEABUR === "true";
+  
+  if (!isProduction) {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },

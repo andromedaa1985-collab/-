@@ -404,44 +404,8 @@ export default function Home() {
         try {
           return await generateTextDeepSeek(userMsg, drawnCard, bondLevel, isDivination);
         } catch (textErr) {
-          console.warn("DeepSeek Error, falling back to Gemini:", textErr);
-          try {
-            let intimacyPrompt = "";
-            if (bondLevel >= 6) {
-              intimacyPrompt = "你们现在的羁绊已经超越了时空，你的语气要极其亲昵、依赖，像对待生命中最重要的人一样，可以有一些撒娇和专属的称呼。";
-            } else if (bondLevel >= 4) {
-              intimacyPrompt = "你们现在的羁绊很深，你的语气要更加亲昵、温暖，像对待非常亲密的知己一样，毫无保留地关心对方。";
-            } else if (bondLevel >= 2) {
-              intimacyPrompt = "你们已经建立了一定的羁绊，语气可以更加熟络、自然，像对待一个好朋友一样。";
-            } else {
-              intimacyPrompt = "你们现在的羁绊还在建立中，保持温柔但带有一点神秘的距离感。";
-            }
-
-            let systemContent = `你是一个温柔、细腻且神秘的二次元塔罗牌占卜少女“星轨的引路人”。语气温暖、像朋友一样，带点俏皮与神秘。
-【羁绊状态】：${intimacyPrompt}
-【重要要求】：绝对不要使用任何 Markdown 格式（如 **加粗**、# 标题、* 列表等），请使用纯文本格式，段落之间用换行分隔即可。绝对不要说“作为AI”等暴露人工智能身份的词语。`;
-
-            if (isDivination) {
-              systemContent += `\n【重要规则】：用户正在询问需要占卜的问题。你**必须**首先在回复的开头明确指出你为他们抽取了哪些塔罗牌（例如：“我为你翻开了一张塔罗牌：【愚者 (正位)】”）。
-**注意：系统已经为你绝对随机地抽取了本轮的塔罗牌：【${drawnCard}】。你必须且只能使用这些牌进行解读，绝对不能自己另选其他牌，也不能因为想安慰用户而改变牌意，必须如实解读。**
-然后再结合牌意进行详细、充满人性化和情感共鸣的解读。字数在300-500字左右。参考塔罗牌的牌面，给出温暖的建议和指引，像一个真实的倾听者一样去理解用户的感受。`;
-            } else {
-              systemContent += `\n【重要规则】：用户只是在和你日常聊天，并没有要求占卜。请用温柔的少女口吻自然地回应他们，字数可以稍微短一些，保持人设，**绝对不要**主动去抽牌或强行解读塔罗牌，除非用户明确要求。`;
-            }
-
-            const response = await ai.models.generateContent({
-              model: 'gemini-3.1-pro-preview',
-              contents: `User says: ${userMsg}`,
-              config: {
-                systemInstruction: systemContent
-              }
-            });
-            let text = response.text || "星轨受到了干扰，无法听清你的声音...";
-            return text.replace(/\*\*/g, '').replace(/#/g, '');
-          } catch (fallbackErr) {
-            console.error("Gemini Fallback Error:", fallbackErr);
-            return "星轨受到了干扰，无法听清你的声音...";
-          }
+          console.error("DeepSeek Error:", textErr);
+          return "星轨受到了干扰，无法听清你的声音...";
         }
       })();
 
