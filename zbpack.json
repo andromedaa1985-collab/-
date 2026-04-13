@@ -1,6 +1,3 @@
 {
-  "builder": "nodejs",
-  "start_command": "npm run start",
-  "build_command": "npm install --include=dev && npm run build",
-  "port": 3000
+  "builder": "docker"
 }
