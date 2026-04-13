@@ -277,7 +277,7 @@ const Landing = () => {
                 <ArrowRight className="w-5 h-5 text-[#5E2C5E] dark:text-[#D488D4] group-hover:text-white dark:group-hover:text-[#2E1A2E] transition-colors duration-300" />
               </div>
             </div>
-            <img src="/image-279.png" alt="Tarot" className="absolute -top-4 right-2 w-[55%] object-contain opacity-90 group-hover:translate-x-2 transition-transform duration-700 drop-shadow-2xl" onError={(e) => e.currentTarget.style.display = 'none'} />
+            {/* <img src="/image-279.png" alt="Tarot" className="absolute -top-4 right-2 w-[55%] object-contain opacity-90 group-hover:translate-x-2 transition-transform duration-700 drop-shadow-2xl" onError={(e) => e.currentTarget.style.display = 'none'} /> */}
           </motion.div>
 
           {/* Feature 3: Simulator */}
@@ -311,7 +311,7 @@ const Landing = () => {
                 <ArrowRight className="w-5 h-5 text-[#2C4A5E] dark:text-[#88BCD4] group-hover:text-white dark:group-hover:text-[#1A282E] transition-colors duration-300" />
               </div>
             </div>
-            <img src="/image-278-1.png" alt="Simulator" className="absolute bottom-4 right-4 w-[55%] object-contain opacity-90 group-hover:scale-110 transition-transform duration-700 drop-shadow-2xl" onError={(e) => e.currentTarget.style.display = 'none'} />
+            {/* <img src="/image-278-1.png" alt="Simulator" className="absolute bottom-4 right-4 w-[55%] object-contain opacity-90 group-hover:scale-110 transition-transform duration-700 drop-shadow-2xl" onError={(e) => e.currentTarget.style.display = 'none'} /> */}
           </motion.div>
 
           {/* Feature 4: Guardian */}
@@ -337,7 +337,7 @@ const Landing = () => {
                 <ArrowRight className="w-5 h-5 text-[#5E452C] dark:text-[#D4B088] group-hover:text-white dark:group-hover:text-[#2E241A] transition-colors duration-300" />
               </div>
             </div>
-            <img src="/image-277-1.png" alt="Guardian" className="absolute bottom-8 right-4 w-[55%] object-contain opacity-90 group-hover:scale-110 transition-transform duration-700 drop-shadow-2xl" onError={(e) => e.currentTarget.style.display = 'none'} />
+            {/* <img src="/image-277-1.png" alt="Guardian" className="absolute bottom-8 right-4 w-[55%] object-contain opacity-90 group-hover:scale-110 transition-transform duration-700 drop-shadow-2xl" onError={(e) => e.currentTarget.style.display = 'none'} /> */}
           </motion.div>
 
           {/* Feature 5: Diary */}
@@ -361,7 +361,7 @@ const Landing = () => {
               </div>
             </div>
             <div className="flex-1 w-full h-full min-h-[200px] flex items-center justify-center relative">
-               <img src="/feature-diary.png" alt="Diary" className="absolute inset-0 w-full h-full object-cover rounded-2xl opacity-80 z-20" onError={(e) => e.currentTarget.style.display = 'none'} />
+               {/* <img src="/feature-diary.png" alt="Diary" className="absolute inset-0 w-full h-full object-cover rounded-2xl opacity-80 z-20" onError={(e) => e.currentTarget.style.display = 'none'} /> */}
                
                {/* Abstract Data Visualization Placeholder */}
                <div className="w-full h-full bg-gradient-to-br from-apple-surface to-apple-bg rounded-2xl border border-apple-border/50 flex flex-col items-center justify-center p-6 relative overflow-hidden z-10 shadow-inner">
