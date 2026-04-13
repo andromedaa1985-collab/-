@@ -141,7 +141,7 @@ const Landing = () => {
           >
             {/* Placeholder for user's 3D image */}
             <img 
-              src="/details.png" 
+              src="/details-new.png" 
               alt="3D Abstract" 
               className="absolute inset-0 w-full h-full object-cover opacity-90 mix-blend-normal group-hover:scale-105 transition-transform duration-1000"
               onError={(e) => {
